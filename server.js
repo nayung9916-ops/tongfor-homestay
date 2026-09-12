@@ -6,14 +6,13 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Resolve DB path (supports both data/database.json and root database.json)
+// Resolve DB path
 let DATA_FILE = path.join(__dirname, 'data', 'database.json');
 if (!fs.existsSync(DATA_FILE)) {
   const rootDb = path.join(__dirname, 'database.json');
   if (fs.existsSync(rootDb)) {
     DATA_FILE = rootDb;
   } else {
-    // If data folder doesn't exist, create it or use root
     try {
       if (!fs.existsSync(path.join(__dirname, 'data'))) {
         fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
@@ -29,7 +28,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(__dirname));
 
-// Default database template
 const DEFAULT_DB = {
   property_name: "โฮมสเตย์ ตองฟอร์",
   rooms: [
@@ -76,7 +74,6 @@ const DEFAULT_DB = {
   agoda_events: []
 };
 
-// Helper: Read DB
 function getDb() {
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -90,7 +87,6 @@ function getDb() {
   return DEFAULT_DB;
 }
 
-// Helper: Save DB
 function saveDb(db) {
   try {
     const dir = path.dirname(DATA_FILE);
@@ -101,7 +97,6 @@ function saveDb(db) {
   }
 }
 
-// Helper: Sync Agoda iCal
 async function syncAgodaRoom(roomId, url) {
   if (!url) return [];
   try {
@@ -166,52 +161,52 @@ async function syncAgodaRoom(roomId, url) {
   }
 }
 
-// Generate Export iCal (.ics)
+// Generate RFC 5545 iCal formatted strictly for OTA parsers (Agoda/Airbnb)
 function generateIcal(roomId, db) {
-  const room = db.rooms.find(r => String(r.id) === String(roomId));
-  const roomName = room ? room.name : `Room ${roomId}`;
   const manualBookings = (db.bookings || []).filter(b => String(b.room_id) === String(roomId) && b.source !== 'agoda');
   const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
   let ics = "BEGIN:VCALENDAR\r\n";
+  ics += "PRODID:-//Tongfor Homestay//EN\r\n";
   ics += "VERSION:2.0\r\n";
-  ics += "PRODID:-//Tongfor Homestay//PMS 1.0//EN\r\n";
-  ics += "CALSCALE:GREGORIAN\r\n";
-  ics += "METHOD:PUBLISH\r\n";
-  ics += `X-WR-CALNAME:โฮมสเตย์ ตองฟอร์ - ${roomName}\r\n`;
 
-  for (const b of manualBookings) {
-    const dtStart = b.check_in.replace(/-/g, '');
-    const dtEnd = b.check_out.replace(/-/g, '');
-    const uid = b.id || Math.random().toString(36).substring(2);
-
+  if (manualBookings.length === 0) {
+    // Crucial: OTAs like Agoda validate feeds by requiring at least 1 VEVENT block!
+    // We add a dummy past event (year 2020) so validation passes without affecting future availability.
     ics += "BEGIN:VEVENT\r\n";
-    ics += `UID:booking-${uid}@tongfor\r\n`;
-    ics += `DTSTAMP:${nowStr}\r\n`;
-    ics += `DTSTART;VALUE=DATE:${dtStart}\r\n`;
-    ics += `DTEND;VALUE=DATE:${dtEnd}\r\n`;
-    ics += `SUMMARY:จอง (${b.source}) - ${b.guest_name}\r\n`;
-    ics += `DESCRIPTION:โทร: ${b.phone || '-'}\r\n`;
-    ics += "STATUS:CONFIRMED\r\n";
+    ics += "SUMMARY:BOOKED\r\n";
+    ics += "CLASS:PUBLIC\r\n";
+    ics += "DTSTART;VALUE=DATE:20200101\r\n";
+    ics += "DTEND;VALUE=DATE:20200102\r\n";
+    ics += `UID:init-${roomId}@tongfor.com\r\n`;
     ics += "END:VEVENT\r\n";
+  } else {
+    for (const b of manualBookings) {
+      const dtStart = b.check_in.replace(/-/g, '');
+      const dtEnd = b.check_out.replace(/-/g, '');
+      const uid = b.id || Math.random().toString(36).substring(2);
+
+      ics += "BEGIN:VEVENT\r\n";
+      ics += "SUMMARY:BOOKED\r\n";
+      ics += "CLASS:PUBLIC\r\n";
+      ics += `DTSTART;VALUE=DATE:${dtStart}\r\n`;
+      ics += `DTEND;VALUE=DATE:${dtEnd}\r\n`;
+      ics += `UID:booking-${uid}@tongfor.com\r\n`;
+      ics += "END:VEVENT\r\n";
+    }
   }
 
   ics += "END:VCALENDAR\r\n";
   return ics;
 }
 
-// Route for Homepage: checks both public/index.html and ./index.html
+// Route for Homepage
 app.get('/', (req, res) => {
   const p1 = path.join(__dirname, 'public', 'index.html');
   const p2 = path.join(__dirname, 'index.html');
   if (fs.existsSync(p1)) return res.sendFile(p1);
   if (fs.existsSync(p2)) return res.sendFile(p2);
-  res.status(200).send(`
-    <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-      <h2>🏡 โฮมสเตย์ ตองฟอร์</h2>
-      <p style="color: #666;">กำลังเชื่อมต่อระบบ กรุณาตรวจสอบว่ามีไฟล์ <b>index.html</b> อยู่บน GitHub หรือไม่</p>
-    </div>
-  `);
+  res.status(200).send('<h1>โฮมสเตย์ ตองฟอร์</h1>');
 });
 
 // API Routes
@@ -263,30 +258,27 @@ app.post('/api/settings', async (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/ical/:roomId.ics', (req, res) => {
+// Handler for iCal feed (supports both /api/ical/:roomId.ics and /:roomId.ics)
+function handleIcalRequest(req, res, roomId) {
+  console.log(`[iCal Request] Received request for room: ${roomId} from UA: ${req.headers['user-agent']}`);
   const db = getDb();
-  const ics = generateIcal(req.params.roomId, db);
+  const ics = generateIcal(roomId, db);
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-  res.setHeader('Content-Disposition', `inline; filename="${req.params.roomId}.ics"`);
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.send(ics);
+}
+
+app.get('/api/ical/:roomId.ics', (req, res) => {
+  handleIcalRequest(req, res, req.params.roomId);
 });
 
-// Auto-sync on startup
-setTimeout(async () => {
-  try {
-    const db = getDb();
-    let allEvents = [];
-    for (const r of db.rooms) {
-      if (r.agoda_ical_url) {
-        const evs = await syncAgodaRoom(r.id, r.agoda_ical_url);
-        allEvents = allEvents.concat(evs);
-        r.last_synced = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      }
-    }
-    db.agoda_events = allEvents;
-    saveDb(db);
-  } catch (e) {}
-}, 2000);
+// Short URL alias directly at root: /101.ics, /102.ics, /103.ics
+app.get('/:roomId.ics', (req, res) => {
+  handleIcalRequest(req, res, req.params.roomId);
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
