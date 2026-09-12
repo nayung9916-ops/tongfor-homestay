@@ -161,7 +161,7 @@ async function syncAgodaRoom(roomId, url) {
   }
 }
 
-// Generate RFC 5545 iCal formatted strictly for OTA parsers (Agoda/Airbnb)
+// Generate RFC 5545 strictly compliant iCal with mandatory DTSTAMP, UID, CRLF
 function generateIcal(roomId, db) {
   const manualBookings = (db.bookings || []).filter(b => String(b.room_id) === String(roomId) && b.source !== 'agoda');
   const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -169,16 +169,20 @@ function generateIcal(roomId, db) {
   let ics = "BEGIN:VCALENDAR\r\n";
   ics += "PRODID:-//Tongfor Homestay//EN\r\n";
   ics += "VERSION:2.0\r\n";
+  ics += "CALSCALE:GREGORIAN\r\n";
+  ics += "METHOD:PUBLISH\r\n";
 
   if (manualBookings.length === 0) {
-    // Crucial: OTAs like Agoda validate feeds by requiring at least 1 VEVENT block!
-    // We add a dummy past event (year 2020) so validation passes without affecting future availability.
+    // Standard initial placeholder with mandatory DTSTAMP for RFC 5545 validation
     ics += "BEGIN:VEVENT\r\n";
+    ics += `DTSTAMP:${nowStr}\r\n`;
+    ics += `UID:init-${roomId}-2026@tongfor.com\r\n`;
+    ics += `DTSTART;VALUE=DATE:20260101\r\n`;
+    ics += `DTEND;VALUE=DATE:20260102\r\n`;
     ics += "SUMMARY:BOOKED\r\n";
+    ics += "DESCRIPTION:BOOKED\r\n";
     ics += "CLASS:PUBLIC\r\n";
-    ics += "DTSTART;VALUE=DATE:20200101\r\n";
-    ics += "DTEND;VALUE=DATE:20200102\r\n";
-    ics += `UID:init-${roomId}@tongfor.com\r\n`;
+    ics += "STATUS:CONFIRMED\r\n";
     ics += "END:VEVENT\r\n";
   } else {
     for (const b of manualBookings) {
@@ -187,11 +191,14 @@ function generateIcal(roomId, db) {
       const uid = b.id || Math.random().toString(36).substring(2);
 
       ics += "BEGIN:VEVENT\r\n";
-      ics += "SUMMARY:BOOKED\r\n";
-      ics += "CLASS:PUBLIC\r\n";
+      ics += `DTSTAMP:${nowStr}\r\n`;
+      ics += `UID:booking-${uid}@tongfor.com\r\n`;
       ics += `DTSTART;VALUE=DATE:${dtStart}\r\n`;
       ics += `DTEND;VALUE=DATE:${dtEnd}\r\n`;
-      ics += `UID:booking-${uid}@tongfor.com\r\n`;
+      ics += "SUMMARY:BOOKED\r\n";
+      ics += `DESCRIPTION:Guest: ${b.guest_name}\r\n`;
+      ics += "CLASS:PUBLIC\r\n";
+      ics += "STATUS:CONFIRMED\r\n";
       ics += "END:VEVENT\r\n";
     }
   }
@@ -200,7 +207,7 @@ function generateIcal(roomId, db) {
   return ics;
 }
 
-// Route for Homepage
+// Homepage
 app.get('/', (req, res) => {
   const p1 = path.join(__dirname, 'public', 'index.html');
   const p2 = path.join(__dirname, 'index.html');
@@ -258,12 +265,13 @@ app.post('/api/settings', async (req, res) => {
   res.json({ success: true });
 });
 
-// Handler for iCal feed (supports both /api/ical/:roomId.ics and /:roomId.ics)
+// Handler for iCal feed
 function handleIcalRequest(req, res, roomId) {
-  console.log(`[iCal Request] Received request for room: ${roomId} from UA: ${req.headers['user-agent']}`);
+  console.log(`[iCal Request] Room: ${roomId} from UA: ${req.headers['user-agent']}`);
   const db = getDb();
   const ics = generateIcal(roomId, db);
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${roomId}.ics"`);
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -275,7 +283,6 @@ app.get('/api/ical/:roomId.ics', (req, res) => {
   handleIcalRequest(req, res, req.params.roomId);
 });
 
-// Short URL alias directly at root: /101.ics, /102.ics, /103.ics
 app.get('/:roomId.ics', (req, res) => {
   handleIcalRequest(req, res, req.params.roomId);
 });
