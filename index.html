@@ -560,13 +560,24 @@
             <td class="py-3 px-3 text-slate-600">${b.phone || '-'}</td>
             <td class="py-3 px-3 font-semibold text-slate-900">฿${Number(b.price || 0).toLocaleString()}</td>
             <td class="py-3 px-3 text-xs">${paidLabel}</td>
-            <td class="py-3 px-3 text-right">
+            <td class="py-3 px-3 text-right space-x-2">
+              <a href="${getGoogleCalUrl(b)}" target="_blank" class="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-medium border border-blue-200 transition" title="ส่งรายการนี้เข้า Google Calendar">
+                📅 ลง Google Cal
+              </a>
               <button onclick="deleteBooking('${b.id}')" class="text-rose-600 hover:text-rose-800 text-xs font-semibold hover:underline">ลบ</button>
             </td>
           </tr>
         `;
       });
       tbody.innerHTML = html;
+    }
+
+    function getGoogleCalUrl(b) {
+      const title = encodeURIComponent(`[ตองฟอร์] ห้อง ${b.room_id} - ${b.guest_name} (${b.source})`);
+      const details = encodeURIComponent(`ชื่อผู้จอง: ${b.guest_name}\nเบอร์โทร: ${b.phone || '-'}\nราคา: ฿${b.price}\nสถานะ: ${b.paid_status}\nหมายเหตุ: ${b.notes || '-'}`);
+      const s = (b.check_in || '').replace(/-/g, '');
+      const e = (b.check_out || '').replace(/-/g, '');
+      return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${s}/${e}&details=${details}`;
     }
 
     function renderSettingsForm() {
