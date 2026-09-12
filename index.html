@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบจัดการห้องพัก - โฮมสเตย์ ตองฟอร์</title>
+  <!-- Google Fonts: Prompt -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Prompt', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            },
+            agoda: '#e11d48',
+            facebook: '#2563eb',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Prompt', sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-emerald-200">
+          🏡
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">โฮมสเตย์ ตองฟอร์</h1>
+          <p class="text-xs text-slate-500">ระบบจัดการห้องพัก 101, 102, 103</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- Sync Agoda Button -->
+        <button id="btn-sync" onclick="syncAgoda()" class="inline-flex items-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all shadow-sm">
+          <svg id="sync-icon" class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          <span id="sync-text">ซิงก์ Agoda</span>
+        </button>
+
+        <!-- New Booking Button -->
+        <button onclick="openBookingModal()" class="inline-flex items-center px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm shadow-blue-200">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>ลงจอง Facebook</span>
+        </button>
+
+        <!-- Settings Button -->
+        <button onclick="openSettingsModal()" class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition" title="ตั้งค่าและลิงก์ iCal">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- STATUS & STATS CARDS -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- Card 1: ห้องทั้งหมด -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+        <div class="w-11 h-11 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">
+          🛏️
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">ห้องพักทั้งหมด</p>
+          <p class="text-xl font-bold text-slate-900">3 ห้อง</p>
+        </div>
+      </div>
+
+      <!-- Card 2: สถานะวันนี้ -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+        <div class="w-11 h-11 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg">
+          👥
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">มีผู้เข้าพักวันนี้</p>
+          <p id="stat-occupied" class="text-xl font-bold text-blue-600">0 ห้อง</p>
+        </div>
+      </div>
+
+      <!-- Card 3: การจองจาก Agoda -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+        <div class="w-11 h-11 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-lg">
+          🔴
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">รายการจอง Agoda</p>
+          <p id="stat-agoda" class="text-xl font-bold text-rose-600">0 รายการ</p>
+        </div>
+      </div>
+
+      <!-- Card 4: การจองจาก Facebook/ตรง -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+        <div class="w-11 h-11 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg">
+          💬
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">จองตรง / Facebook</p>
+          <p id="stat-manual" class="text-xl font-bold text-indigo-600">0 รายการ</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR TIMELINE / TAPE CHART -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      
+      <!-- Calendar Header Controls -->
+      <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+        <div class="flex items-center space-x-3">
+          <h2 id="current-month-display" class="text-lg font-bold text-slate-900">กันยายน 2026</h2>
+          <div class="flex items-center bg-white border border-slate-300 rounded-lg shadow-sm">
+            <button onclick="changeMonth(-1)" class="p-1.5 hover:bg-slate-100 text-slate-600 rounded-l-lg transition" title="เดือนก่อนหน้า">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <button onclick="goToCurrentMonth()" class="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 border-x border-slate-200 transition">วันนี้</button>
+            <button onclick="changeMonth(1)" class="p-1.5 hover:bg-slate-100 text-slate-600 rounded-r-lg transition" title="เดือนถัดไป">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <div class="flex items-center space-x-1.5">
+            <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+            <span class="text-slate-600">ว่าง (คลิกเพื่อจอง)</span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+            <span class="text-slate-600">จองผ่าน Agoda</span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <span class="w-3 h-3 rounded-full bg-blue-600 inline-block"></span>
+            <span class="text-slate-600">จอง Facebook / ตรง</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calendar Matrix Table -->
+      <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full border-collapse text-left min-w-[950px]">
+          <thead>
+            <tr id="calendar-date-header" class="bg-slate-100/75 border-b border-slate-200 text-xs font-semibold text-slate-600">
+              <!-- Dynamically rendered days -->
+            </tr>
+          </thead>
+          <tbody id="calendar-room-rows" class="divide-y divide-slate-200 text-sm">
+            <!-- Dynamically rendered room rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer Info -->
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div class="flex items-center space-x-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span id="last-sync-label">ซิงก์ Agoda ล่าสุด: กำลังโหลด...</span>
+        </div>
+        <div>คลิกที่ช่องวันที่ว่าง เพื่อเปิดฟอร์มลงจองได้ทันที</div>
+      </div>
+    </div>
+
+    <!-- BOOKINGS LIST TABLE -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-slate-900 text-base">รายการจองทั้งหมด</h3>
+          <p class="text-xs text-slate-500">ตรวจสอบและจัดการข้อมูลผู้เข้าพัก</p>
+        </div>
+        <div class="text-xs text-slate-400" id="booking-count-badge">0 รายการ</div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs sm:text-sm">
+          <thead class="bg-slate-50 text-slate-600 font-semibold border-y border-slate-200">
+            <tr>
+              <th class="py-3 px-3">ห้อง</th>
+              <th class="py-3 px-3">ช่องทาง</th>
+              <th class="py-3 px-3">ชื่อผู้จอง / ลูกค้า</th>
+              <th class="py-3 px-3">เช็คอิน - เช็คเอาต์</th>
+              <th class="py-3 px-3">เบอร์โทร</th>
+              <th class="py-3 px-3">ราคา</th>
+              <th class="py-3 px-3">สถานะ</th>
+              <th class="py-3 px-3 text-right">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="booking-list-body" class="divide-y divide-slate-100">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- MODAL 1: ADD BOOKING -->
+  <div id="modal-booking" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+          <span>➕</span>
+          <span>ลงจองห้องพัก (Facebook / Walk-in)</span>
+        </h3>
+        <button onclick="closeModal('modal-booking')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+      </div>
+
+      <form id="form-booking" onsubmit="saveBooking(event)" class="space-y-3.5 text-xs sm:text-sm">
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">เลือกห้องพัก *</label>
+          <select id="book-room" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="101">ห้อง 101 (Standard)</option>
+            <option value="102">ห้อง 102 (Deluxe)</option>
+            <option value="103">ห้อง 103 (Family)</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">วันเช็คอิน *</label>
+            <input type="date" id="book-checkin" required class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">วันเช็คเอาต์ *</label>
+            <input type="date" id="book-checkout" required class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">ช่องทางการจอง</label>
+          <select id="book-source" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="facebook">📘 Facebook (เพจ/แชท)</option>
+            <option value="line">🟢 LINE Official / LINE</option>
+            <option value="walkin">🚶 Walk-in (หน้าร้าน)</option>
+            <option value="phone">📞 โทรศัพท์จอง</option>
+            <option value="direct">🏷️ จองตรงอื่นๆ</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">ชื่อผู้จอง / ลูกค้า *</label>
+          <input type="text" id="book-guest" required placeholder="เช่น คุณสุดา รักษ์ดี" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">เบอร์โทรศัพท์</label>
+            <input type="text" id="book-phone" placeholder="08x-xxx-xxxx" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">ยอดเงินรวม (บาท)</label>
+            <input type="number" id="book-price" placeholder="เช่น 1500" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">สถานะการชำระเงิน</label>
+          <select id="book-paid" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="paid">✅ ชำระครบแล้ว</option>
+            <option value="deposit">💳 มัดจำแล้ว</option>
+            <option value="unpaid">⏳ ยังไม่ชำระ / ชำระวันเข้าพัก</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">หมายเหตุเพิ่มเติม</label>
+          <textarea id="book-notes" rows="2" placeholder="เช่น ขอเตียงเสริม, เช็คอินดึก 20:00 น." class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+        </div>
+
+        <div class="flex items-center justify-end space-x-2 pt-3 border-t">
+          <button type="button" onclick="closeModal('modal-booking')" class="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 font-medium">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md shadow-blue-200">บันทึกการจอง</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: SETTINGS & ICAL SYNC -->
+  <div id="modal-settings" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+          <span>⚙️</span>
+          <span>ตั้งค่าการเชื่อมต่อปฏิทิน (Two-way iCal Sync)</span>
+        </h3>
+        <button onclick="closeModal('modal-settings')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+      </div>
+
+      <!-- Explanation Box -->
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-800 space-y-1">
+        <p class="font-bold flex items-center">
+          <span class="mr-1">💡</span> วิธีทำให้ Agoda ปิดห้องอัตโนมัติเมื่อมีการจองใน Facebook:
+        </p>
+        <p>1. คัดลอก <strong>"ลิงก์ส่งออก (Export iCal)"</strong> ของแต่ละห้องด้านล่าง</p>
+        <p>2. ไปที่ <strong>Agoda YCS > Calendar Sync > กด Import Calendar</strong> แล้ววางลิงก์ลงไป</p>
+      </div>
+
+      <!-- Room Settings List -->
+      <div class="space-y-4" id="settings-room-list">
+        <!-- Rendered by JS for 101, 102, 103 -->
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-3 border-t">
+        <button type="button" onclick="closeModal('modal-settings')" class="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 font-medium text-sm">ปิด</button>
+        <button type="button" onclick="saveSettings()" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm shadow-md shadow-emerald-200">บันทึกการตั้งค่า</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform transition-all duration-300 translate-y-20 opacity-0 pointer-events-none bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2 text-sm">
+    <span id="toast-icon">✅</span>
+    <span id="toast-msg">ข้อความแจ้งเตือน</span>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let appState = {
+      property_name: "โฮมสเตย์ ตองฟอร์",
+      rooms: [],
+      bookings: [],
+      agoda_events: [],
+      currentDate: new Date()
+    };
+
+    const thaiMonths = [
+      "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+      "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+    ];
+
+    // โหลดข้อมูลครั้งแรก
+    document.addEventListener("DOMContentLoaded", () => {
+      fetchStatus();
+    });
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/status');
+        if (res.ok) {
+          const data = await res.json();
+          appState.rooms = data.rooms || [];
+          appState.bookings = data.bookings || [];
+          appState.agoda_events = data.agoda_events || [];
+          appState.property_name = data.property_name || "โฮมสเตย์ ตองฟอร์";
+          
+          updateStats();
+          renderCalendar();
+          renderBookingList();
+          renderSettingsForm();
+        }
+      } catch (err) {
+        console.error("Fetch status error:", err);
+      }
+    }
+
+    async function syncAgoda() {
+      const btn = document.getElementById('btn-sync');
+      const icon = document.getElementById('sync-icon');
+      const text = document.getElementById('sync-text');
+      
+      icon.classList.add('animate-spin');
+      text.innerText = 'กำลังซิงก์...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/sync', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`ซิงก์สำเร็จ! พบ ${data.count} วันจองจาก Agoda`);
+          await fetchStatus();
+        } else {
+          showToast('ซิงก์ล้มเหลว ตรวจสอบ URL', '❌');
+        }
+      } catch (err) {
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ', '❌');
+      } finally {
+        icon.classList.remove('animate-spin');
+        text.innerText = 'ซิงก์ Agoda';
+        btn.disabled = false;
+      }
+    }
+
+    function updateStats() {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      
+      // นับผู้เข้าพักวันนี้
+      let occupied = 0;
+      const allEvents = [...appState.bookings, ...appState.agoda_events];
+      allEvents.forEach(ev => {
+        if (ev.check_in <= todayStr && todayStr < ev.check_out) {
+          occupied++;
+        }
+      });
+
+      document.getElementById('stat-occupied').innerText = `${occupied} ห้อง`;
+      document.getElementById('stat-agoda').innerText = `${appState.agoda_events.length} วัน`;
+      document.getElementById('stat-manual').innerText = `${appState.bookings.length} รายการ`;
+
+      const lastSync = appState.rooms[0]?.last_synced || 'ยังไม่เคยซิงก์';
+      document.getElementById('last-sync-label').innerText = `ซิงก์ Agoda ล่าสุด: ${lastSync}`;
+      document.getElementById('booking-count-badge').innerText = `${appState.bookings.length} รายการ`;
+    }
+
+    function changeMonth(delta) {
+      appState.currentDate.setMonth(appState.currentDate.getMonth() + delta);
+      renderCalendar();
+    }
+
+    function goToCurrentMonth() {
+      appState.currentDate = new Date();
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const year = appState.currentDate.getFullYear();
+      const month = appState.currentDate.getMonth();
+      
+      document.getElementById('current-month-display').innerText = `${thaiMonths[month]} ${year + 543}`;
+
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const today = new Date();
+      const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+      const todayDate = today.getDate();
+
+      // Render Header Days
+      const header = document.getElementById('calendar-date-header');
+      let headerHtml = `<th class="py-3 px-4 w-44 bg-slate-100 font-bold text-slate-700 sticky left-0 z-10">ห้องพัก</th>`;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const isToday = isCurrentMonth && d === todayDate;
+        const dayDate = new Date(year, month, d);
+        const dayOfWeek = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"][dayDate.getDay()];
+        const isWeekend = dayDate.getDay() === 0 || dayDate.getDay() === 6;
+
+        headerHtml += `
+          <th class="py-2 px-1 text-center min-w-[42px] ${isToday ? 'bg-blue-100 text-blue-800 font-bold' : isWeekend ? 'bg-slate-100/90 text-rose-500' : 'text-slate-600'}">
+            <div class="text-[10px] uppercase">${dayOfWeek}</div>
+            <div class="text-xs ${isToday ? 'w-6 h-6 mx-auto rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm' : ''}">${d}</div>
+          </th>
+        `;
+      }
+      header.innerHTML = headerHtml;
+
+      // Render Room Rows
+      const tbody = document.getElementById('calendar-room-rows');
+      let tbodyHtml = '';
+
+      appState.rooms.forEach(room => {
+        tbodyHtml += `<tr class="hover:bg-slate-50/50 transition">`;
+        tbodyHtml += `
+          <td class="py-3 px-4 bg-white sticky left-0 z-10 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)]">
+            <div class="font-bold text-slate-900">${room.name}</div>
+            <div class="text-[11px] text-slate-500">${room.type} (฿${room.price})</div>
+          </td>
+        `;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          
+          // ตรวจสอบว่าวันนี้มีจองหรือไม่
+          const agodaBooking = appState.agoda_events.find(ev => ev.room_id == room.id && ev.check_in <= dateStr && dateStr < ev.check_out);
+          const manualBooking = appState.bookings.find(bk => bk.room_id == room.id && bk.check_in <= dateStr && dateStr < bk.check_out);
+
+          if (agodaBooking) {
+            tbodyHtml += `
+              <td class="p-0.5 text-center border-r border-slate-100 bg-rose-50" title="จองผ่าน Agoda (${agodaBooking.check_in} - ${agodaBooking.check_out})">
+                <div class="h-10 rounded bg-rose-500 text-white flex flex-col items-center justify-center text-[10px] font-semibold px-0.5 shadow-sm cursor-pointer hover:bg-rose-600 transition">
+                  <span>Agoda</span>
+                </div>
+              </td>
+            `;
+          } else if (manualBooking) {
+            const isFirstDay = manualBooking.check_in === dateStr;
+            tbodyHtml += `
+              <td class="p-0.5 text-center border-r border-slate-100 bg-blue-50" title="จองโดย: ${manualBooking.guest_name} (${manualBooking.source}) โทร: ${manualBooking.phone}">
+                <div onclick="viewBooking('${manualBooking.id}')" class="h-10 rounded bg-blue-600 text-white flex flex-col items-center justify-center text-[10px] font-medium px-0.5 shadow-sm cursor-pointer hover:bg-blue-700 transition overflow-hidden">
+                  <span class="truncate w-full text-center">${manualBooking.guest_name.split(' ')[0]}</span>
+                  <span class="text-[8px] opacity-80">${manualBooking.source === 'facebook' ? 'FB' : manualBooking.source}</span>
+                </div>
+              </td>
+            `;
+          } else {
+            // วันว่าง
+            tbodyHtml += `
+              <td class="p-0.5 text-center border-r border-slate-100 group">
+                <button onclick="quickBook('${room.id}', '${dateStr}')" class="w-full h-10 rounded hover:bg-emerald-100/70 border border-transparent hover:border-emerald-300 flex items-center justify-center text-slate-300 hover:text-emerald-700 font-bold transition text-xs" title="คลิกเพื่อลงจองห้อง ${room.id} วันที่ ${dateStr}">
+                  <span class="opacity-0 group-hover:opacity-100">+</span>
+                </button>
+              </td>
+            `;
+          }
+        }
+
+        tbodyHtml += `</tr>`;
+      });
+
+      tbody.innerHTML = tbodyHtml;
+    }
+
+    function renderBookingList() {
+      const tbody = document.getElementById('booking-list-body');
+      if (appState.bookings.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">ยังไม่มีรายการจองตรง/Facebook</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      appState.bookings.slice().reverse().forEach(b => {
+        const sourceLabel = {
+          facebook: '<span class="px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium text-xs">Facebook</span>',
+          line: '<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium text-xs">LINE</span>',
+          walkin: '<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-medium text-xs">Walk-in</span>',
+          phone: '<span class="px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-medium text-xs">โทรจอง</span>',
+        }[b.source] || `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-xs">${b.source}</span>`;
+
+        const paidLabel = {
+          paid: '<span class="text-emerald-600 font-medium">✅ ชำระครบ</span>',
+          deposit: '<span class="text-blue-600 font-medium">💳 มัดจำแล้ว</span>',
+          unpaid: '<span class="text-rose-600 font-medium">⏳ ยังไม่ชำระ</span>',
+        }[b.paid_status] || b.paid_status;
+
+        html += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-3 font-bold text-slate-900">ห้อง ${b.room_id}</td>
+            <td class="py-3 px-3">${sourceLabel}</td>
+            <td class="py-3 px-3 font-medium text-slate-800">${b.guest_name}</td>
+            <td class="py-3 px-3 text-slate-600">${b.check_in} ถึง ${b.check_out}</td>
+            <td class="py-3 px-3 text-slate-600">${b.phone || '-'}</td>
+            <td class="py-3 px-3 font-semibold text-slate-900">฿${Number(b.price || 0).toLocaleString()}</td>
+            <td class="py-3 px-3 text-xs">${paidLabel}</td>
+            <td class="py-3 px-3 text-right">
+              <button onclick="deleteBooking('${b.id}')" class="text-rose-600 hover:text-rose-800 text-xs font-semibold hover:underline">ลบ</button>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function renderSettingsForm() {
+      const container = document.getElementById('settings-room-list');
+      let html = '';
+      
+      const origin = window.location.origin;
+
+      appState.rooms.forEach(r => {
+        const exportUrl = `${origin}/api/ical/${r.id}.ics`;
+        html += `
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="font-bold text-slate-900 text-sm flex items-center">
+                <span class="w-3 h-3 rounded-full bg-blue-600 mr-2"></span>
+                ${r.name} (${r.type})
+              </h4>
+              <span class="text-xs text-slate-400">ID: ${r.id}</span>
+            </div>
+
+            <!-- Agoda iCal Inbound URL -->
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">
+                📥 ลิงก์ iCal จาก Agoda (สำหรับดึงวันจองมาบล็อกในระบบ):
+              </label>
+              <input type="url" id="agoda-url-${r.id}" value="${r.agoda_ical_url || ''}" placeholder="https://portal.agoda.com/en-us/api/ari/icalendar?key=..." class="w-full text-xs font-mono border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+
+            <!-- System iCal Outbound URL -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200">
+              <label class="block text-xs font-semibold text-emerald-700 mb-1">
+                📤 ลิงก์ iCal ส่งออก (นำลิงก์นี้ไปใส่ใน Agoda YCS เพื่อให้ Agoda ปิดห้องอัตโนมัติ):
+              </label>
+              <div class="flex items-center space-x-2">
+                <input type="text" readonly value="${exportUrl}" class="w-full text-xs font-mono bg-slate-50 border border-slate-200 rounded p-1.5 text-slate-600 focus:outline-none select-all">
+                <button type="button" onclick="copyToClipboard('${exportUrl}')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-medium whitespace-nowrap">
+                  คัดลอก
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // ฟังก์ชันเปิด Modal จองแบบด่วนเมื่อคลิกวันว่าง
+    function quickBook(roomId, dateStr) {
+      document.getElementById('book-room').value = roomId;
+      document.getElementById('book-checkin').value = dateStr;
+      
+      // วันเช็คเอาต์วันถัดไป
+      const nextDay = new Date(dateStr);
+      nextDay.setDate(nextDay.getDate() + 1);
+      document.getElementById('book-checkout').value = nextDay.toISOString().slice(0, 10);
+      
+      const room = appState.rooms.find(r => r.id == roomId);
+      if (room) {
+        document.getElementById('book-price').value = room.price || '';
+      }
+
+      openModal('modal-booking');
+    }
+
+    async function saveBooking(e) {
+      e.preventDefault();
+      const booking = {
+        room_id: document.getElementById('book-room').value,
+        check_in: document.getElementById('book-checkin').value,
+        check_out: document.getElementById('book-checkout').value,
+        source: document.getElementById('book-source').value,
+        guest_name: document.getElementById('book-guest').value,
+        phone: document.getElementById('book-phone').value,
+        price: Number(document.getElementById('book-price').value) || 0,
+        paid_status: document.getElementById('book-paid').value,
+        notes: document.getElementById('book-notes').value
+      };
+
+      if (booking.check_in >= booking.check_out) {
+        alert('วันเช็คเอาต์ต้องอยู่หลังวันเช็คอินอย่างน้อย 1 วัน');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(booking)
+        });
+        if (res.ok) {
+          closeModal('modal-booking');
+          document.getElementById('form-booking').reset();
+          showToast('บันทึกการจองสำเร็จ ปฏิทินถูกล็อกแล้ว');
+          await fetchStatus();
+        }
+      } catch (err) {
+        showToast('เกิดข้อผิดพลาดในการบันทึก', '❌');
+      }
+    }
+
+    async function deleteBooking(id) {
+      if (!confirm('ต้องการลบรายการจองนี้ใช่หรือไม่?')) return;
+      try {
+        const res = await fetch(`/api/bookings?id=${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('ลบรายการจองเรียบร้อย');
+          await fetchStatus();
+        }
+      } catch (err) {
+        showToast('ไม่สามารถลบรายการได้', '❌');
+      }
+    }
+
+    async function saveSettings() {
+      appState.rooms.forEach(r => {
+        const input = document.getElementById(`agoda-url-${r.id}`);
+        if (input) {
+          r.agoda_ical_url = input.value.trim();
+        }
+      });
+
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rooms: appState.rooms, property_name: appState.property_name })
+        });
+        if (res.ok) {
+          closeModal('modal-settings');
+          showToast('บันทึกการตั้งค่าเรียบร้อย กำลังซิงก์ข้อมูล...');
+          await syncAgoda();
+        }
+      } catch (err) {
+        showToast('เกิดข้อผิดพลาดในการบันทึก', '❌');
+      }
+    }
+
+    function viewBooking(id) {
+      const b = appState.bookings.find(bk => bk.id === id);
+      if (!b) return;
+      alert(`รายละเอียดการจองห้อง ${b.room_id}\nผู้จอง: ${b.guest_name}\nเบอร์โทร: ${b.phone}\nวันที่: ${b.check_in} ถึง ${b.check_out}\nราคา: ฿${b.price}\nช่องทาง: ${b.source}\nหมายเหตุ: ${b.notes || '-'}`);
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('คัดลอกลิงก์เรียบร้อยแล้ว!');
+      });
+    }
+
+    function openBookingModal() {
+      document.getElementById('form-booking').reset();
+      const today = new Date().toISOString().slice(0, 10);
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      document.getElementById('book-checkin').value = today;
+      document.getElementById('book-checkout').value = tomorrow;
+      openModal('modal-booking');
+    }
+
+    function openSettingsModal() {
+      renderSettingsForm();
+      openModal('modal-settings');
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function showToast(msg, icon = '✅') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-icon').innerText = icon;
+      document.getElementById('toast-msg').innerText = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

@@ -5,23 +5,100 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data', 'database.json');
+
+// Resolve DB path (supports both data/database.json and root database.json)
+let DATA_FILE = path.join(__dirname, 'data', 'database.json');
+if (!fs.existsSync(DATA_FILE)) {
+  const rootDb = path.join(__dirname, 'database.json');
+  if (fs.existsSync(rootDb)) {
+    DATA_FILE = rootDb;
+  } else {
+    // If data folder doesn't exist, create it or use root
+    try {
+      if (!fs.existsSync(path.join(__dirname, 'data'))) {
+        fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
+      }
+    } catch (e) {
+      DATA_FILE = rootDb;
+    }
+  }
+}
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
+
+// Default database template
+const DEFAULT_DB = {
+  property_name: "โฮมสเตย์ ตองฟอร์",
+  rooms: [
+    {
+      id: "101",
+      name: "ห้อง 101",
+      type: "ห้องมาตรฐาน (Standard)",
+      price: 800,
+      agoda_ical_url: "https://portal.agoda.com/en-us/api/ari/icalendar?key=G2Eb%2fjbsh3vaCQaQ%2foikbw%2fxCfDtGot2",
+      last_synced: null
+    },
+    {
+      id: "102",
+      name: "ห้อง 102",
+      type: "ห้องดีลักซ์ (Deluxe)",
+      price: 1000,
+      agoda_ical_url: "",
+      last_synced: null
+    },
+    {
+      id: "103",
+      name: "ห้อง 103",
+      type: "ห้องครอบครัว (Family)",
+      price: 1500,
+      agoda_ical_url: "",
+      last_synced: null
+    }
+  ],
+  bookings: [
+    {
+      id: "bk-demo-1",
+      room_id: "102",
+      guest_name: "คุณสมชาย (ตัวอย่าง)",
+      phone: "081-234-5678",
+      check_in: "2026-09-15",
+      check_out: "2026-09-17",
+      source: "facebook",
+      price: 2000,
+      paid_status: "paid",
+      notes: "จองผ่านเพจ Facebook โอนมัดจำเรียบร้อย",
+      created_at: "2026-09-12T15:00:00Z"
+    }
+  ],
+  agoda_events: []
+};
 
 // Helper: Read DB
 function getDb() {
-  if (fs.existsSync(DATA_FILE)) {
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const content = fs.readFileSync(DATA_FILE, 'utf8');
+      if (content.trim()) return JSON.parse(content);
+    }
+  } catch (err) {
+    console.error("Read DB error:", err.message);
   }
-  return { property_name: "โฮมสเตย์ ตองฟอร์", rooms: [], bookings: [], agoda_events: [] };
+  saveDb(DEFAULT_DB);
+  return DEFAULT_DB;
 }
 
 // Helper: Save DB
 function saveDb(db) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), 'utf8');
+  try {
+    const dir = path.dirname(DATA_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), 'utf8');
+  } catch (err) {
+    console.error("Save DB error:", err.message);
+  }
 }
 
 // Helper: Sync Agoda iCal
@@ -93,7 +170,7 @@ async function syncAgodaRoom(roomId, url) {
 function generateIcal(roomId, db) {
   const room = db.rooms.find(r => String(r.id) === String(roomId));
   const roomName = room ? room.name : `Room ${roomId}`;
-  const manualBookings = db.bookings.filter(b => String(b.room_id) === String(roomId) && b.source !== 'agoda');
+  const manualBookings = (db.bookings || []).filter(b => String(b.room_id) === String(roomId) && b.source !== 'agoda');
   const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
   let ics = "BEGIN:VCALENDAR\r\n";
@@ -123,6 +200,20 @@ function generateIcal(roomId, db) {
   return ics;
 }
 
+// Route for Homepage: checks both public/index.html and ./index.html
+app.get('/', (req, res) => {
+  const p1 = path.join(__dirname, 'public', 'index.html');
+  const p2 = path.join(__dirname, 'index.html');
+  if (fs.existsSync(p1)) return res.sendFile(p1);
+  if (fs.existsSync(p2)) return res.sendFile(p2);
+  res.status(200).send(`
+    <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+      <h2>🏡 โฮมสเตย์ ตองฟอร์</h2>
+      <p style="color: #666;">กำลังเชื่อมต่อระบบ กรุณาตรวจสอบว่ามีไฟล์ <b>index.html</b> อยู่บน GitHub หรือไม่</p>
+    </div>
+  `);
+});
+
 // API Routes
 app.get('/api/status', (req, res) => {
   res.json(getDb());
@@ -150,6 +241,7 @@ app.post('/api/bookings', (req, res) => {
     created_at: new Date().toISOString(),
     ...req.body
   };
+  if (!db.bookings) db.bookings = [];
   db.bookings.push(booking);
   saveDb(db);
   res.json({ success: true, booking });
@@ -158,7 +250,7 @@ app.post('/api/bookings', (req, res) => {
 app.delete('/api/bookings', (req, res) => {
   const id = req.query.id || req.body?.id;
   const db = getDb();
-  db.bookings = db.bookings.filter(b => String(b.id) !== String(id));
+  db.bookings = (db.bookings || []).filter(b => String(b.id) !== String(id));
   saveDb(db);
   res.json({ success: true });
 });
@@ -179,8 +271,8 @@ app.get('/api/ical/:roomId.ics', (req, res) => {
   res.send(ics);
 });
 
-// Periodic auto-sync every 10 minutes
-setInterval(async () => {
+// Auto-sync on startup
+setTimeout(async () => {
   try {
     const db = getDb();
     let allEvents = [];
@@ -193,11 +285,8 @@ setInterval(async () => {
     }
     db.agoda_events = allEvents;
     saveDb(db);
-    console.log(`[Auto-Sync] Synced ${allEvents.length} events from Agoda`);
-  } catch (err) {
-    console.error('[Auto-Sync] Error:', err.message);
-  }
-}, 10 * 60 * 1000);
+  } catch (e) {}
+}, 2000);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
