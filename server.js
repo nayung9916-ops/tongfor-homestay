@@ -37,6 +37,8 @@ const DEFAULT_DB = {
       type: "ห้องมาตรฐาน (Standard)",
       price: 800,
       agoda_ical_url: "https://portal.agoda.com/en-us/api/ari/icalendar?key=G2Eb%2fjbsh3vaCQaQ%2foikbw%2fxCfDtGot2",
+      google_ical_url: "https://calendar.google.com/calendar/ical/50cc724142402ddb0d0d5f336bc76ae41eb60a6f397596d552f7cf226cbf91f1%40group.calendar.google.com/public/basic.ics",
+      google_script_url: "https://script.google.com/macros/s/AKfycbwvJ4lsqRDPHpFWIvvZVkTg5pRUxFBjwj7xu4m8x1OMEUkLvxolskHnfd0jHkOD7qVm/exec",
       last_synced: null
     },
     {
@@ -45,6 +47,8 @@ const DEFAULT_DB = {
       type: "ห้องดีลักซ์ (Deluxe)",
       price: 1000,
       agoda_ical_url: "",
+      google_ical_url: "",
+      google_script_url: "",
       last_synced: null
     },
     {
@@ -53,6 +57,8 @@ const DEFAULT_DB = {
       type: "ห้องครอบครัว (Family)",
       price: 1500,
       agoda_ical_url: "",
+      google_ical_url: "",
+      google_script_url: "",
       last_synced: null
     }
   ],
@@ -78,7 +84,20 @@ function getDb() {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const content = fs.readFileSync(DATA_FILE, 'utf8');
-      if (content.trim()) return JSON.parse(content);
+      if (content.trim()) {
+        const parsed = JSON.parse(content);
+        // Ensure room 101 has google script & ical url
+        const r101 = (parsed.rooms || []).find(r => String(r.id) === "101");
+        if (r101) {
+          if (!r101.google_script_url) {
+            r101.google_script_url = "https://script.google.com/macros/s/AKfycbwvJ4lsqRDPHpFWIvvZVkTg5pRUxFBjwj7xu4m8x1OMEUkLvxolskHnfd0jHkOD7qVm/exec";
+          }
+          if (!r101.google_ical_url) {
+            r101.google_ical_url = "https://calendar.google.com/calendar/ical/50cc724142402ddb0d0d5f336bc76ae41eb60a6f397596d552f7cf226cbf91f1%40group.calendar.google.com/public/basic.ics";
+          }
+        }
+        return parsed;
+      }
     }
   } catch (err) {
     console.error("Read DB error:", err.message);
@@ -97,7 +116,8 @@ function saveDb(db) {
   }
 }
 
-async function syncAgodaRoom(roomId, url) {
+// Parse iCal helper (handles both Agoda and Google Calendar feeds)
+async function parseIcalUrl(roomId, url, sourceName) {
   if (!url) return [];
   try {
     const res = await fetch(url);
@@ -109,7 +129,7 @@ async function syncAgodaRoom(roomId, url) {
     let curStart = '';
     let curEnd = '';
     let curUid = '';
-    let curSummary = 'Agoda Booking';
+    let curSummary = `${sourceName} Booking`;
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -118,18 +138,18 @@ async function syncAgodaRoom(roomId, url) {
         curStart = '';
         curEnd = '';
         curUid = Math.random().toString(36).substring(2);
-        curSummary = 'Agoda Booking';
+        curSummary = `${sourceName} Booking`;
       } else if (trimmed === 'END:VEVENT') {
         if (inEvent && curStart && curEnd) {
           events.push({
-            id: `agoda-${curUid}`,
+            id: `${sourceName.toLowerCase()}-${curUid}`,
             room_id: String(roomId),
             uid: curUid,
             check_in: curStart,
             check_out: curEnd,
             summary: curSummary,
-            source: 'agoda',
-            guest_name: 'Agoda Guest',
+            source: sourceName.toLowerCase(),
+            guest_name: `${sourceName} Guest`,
             phone: '-',
             price: 0,
             paid_status: 'paid'
@@ -150,18 +170,18 @@ async function syncAgodaRoom(roomId, url) {
         } else if (trimmed.startsWith('UID:')) {
           curUid = trimmed.substring(4).trim();
         } else if (trimmed.startsWith('SUMMARY')) {
-          curSummary = trimmed.split(':')[1]?.trim() || 'Agoda Booking';
+          curSummary = trimmed.split(':')[1]?.trim() || `${sourceName} Booking`;
         }
       }
     }
     return events;
   } catch (err) {
-    console.error(`[Agoda Sync] Error room ${roomId}:`, err.message);
+    console.error(`[${sourceName} Sync] Error room ${roomId}:`, err.message);
     return [];
   }
 }
 
-// Generate RFC 5545 strictly compliant iCal with mandatory DTSTAMP, UID, CRLF
+// Generate RFC 5545 iCal
 function generateIcal(roomId, db) {
   const manualBookings = (db.bookings || []).filter(b => String(b.room_id) === String(roomId) && b.source !== 'agoda');
   const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -173,7 +193,6 @@ function generateIcal(roomId, db) {
   ics += "METHOD:PUBLISH\r\n";
 
   if (manualBookings.length === 0) {
-    // Standard initial placeholder with mandatory DTSTAMP for RFC 5545 validation
     ics += "BEGIN:VEVENT\r\n";
     ics += `DTSTAMP:${nowStr}\r\n`;
     ics += `UID:init-${roomId}-2026@tongfor.com\r\n`;
@@ -226,17 +245,18 @@ app.post('/api/sync', async (req, res) => {
   let allEvents = [];
   for (const r of db.rooms) {
     if (r.agoda_ical_url) {
-      const evs = await syncAgodaRoom(r.id, r.agoda_ical_url);
-      allEvents = allEvents.concat(evs);
-      r.last_synced = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      const agodaEvs = await parseIcalUrl(r.id, r.agoda_ical_url, 'Agoda');
+      allEvents = allEvents.concat(agodaEvs);
     }
+    r.last_synced = new Date().toISOString().replace('T', ' ').substring(0, 19);
   }
   db.agoda_events = allEvents;
   saveDb(db);
   res.json({ success: true, count: allEvents.length, db });
 });
 
-app.post('/api/bookings', (req, res) => {
+// Create booking: Saves locally AND automatically pushes to Google Calendar!
+app.post('/api/bookings', async (req, res) => {
   const db = getDb();
   const booking = {
     id: `bk-${Date.now()}`,
@@ -246,7 +266,29 @@ app.post('/api/bookings', (req, res) => {
   if (!db.bookings) db.bookings = [];
   db.bookings.push(booking);
   saveDb(db);
-  res.json({ success: true, booking });
+
+  // Auto-push to Google Calendar via Webhook
+  const room = (db.rooms || []).find(r => String(r.id) === String(booking.room_id));
+  const webhookUrl = room?.google_script_url || (String(booking.room_id) === '101' ? "https://script.google.com/macros/s/AKfycbwvJ4lsqRDPHpFWIvvZVkTg5pRUxFBjwj7xu4m8x1OMEUkLvxolskHnfd0jHkOD7qVm/exec" : null);
+  
+  if (webhookUrl) {
+    try {
+      console.log(`[Google Sync] Pushing booking for room ${booking.room_id} to Google Apps Script...`);
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          ...booking
+        })
+      }).then(r => console.log(`[Google Sync] Pushed to Google Calendar!`))
+        .catch(err => console.error('[Google Sync Error]', err.message));
+    } catch (e) {
+      console.error('[Google Sync Exception]', e.message);
+    }
+  }
+
+  res.json({ success: true, booking, googleSynced: !!webhookUrl });
 });
 
 app.delete('/api/bookings', (req, res) => {
