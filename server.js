@@ -48,9 +48,9 @@ const DEFAULT_DB = {
       name: "ห้อง 102",
       type: "ห้องดีลักซ์ (Deluxe)",
       price: 1000,
-      agoda_ical_url: "",
-      google_ical_url: "",
-      google_script_url: "",
+      agoda_ical_url: "https://portal.agoda.com/en-us/api/ari/icalendar?key=JdnOu0feTcggo9VWuQI1Rjk7FjxKIg8V",
+      google_ical_url: "https://calendar.google.com/calendar/ical/5254f02e175f593d4ee70b0e32cb5dd117a16323e48c472774d6c6739a6021ae%40group.calendar.google.com/public/basic.ics",
+      google_script_url: GOOGLE_SCRIPT_WEBHOOK_101,
       last_synced: null
     },
     {
@@ -79,6 +79,13 @@ function getDb() {
           r101.google_script_url = GOOGLE_SCRIPT_WEBHOOK_101;
           if (!r101.google_ical_url) {
             r101.google_ical_url = "https://calendar.google.com/calendar/ical/50cc724142402ddb0d0d5f336bc76ae41eb60a6f397596d552f7cf226cbf91f1%40group.calendar.google.com/public/basic.ics";
+          }
+        }
+        const r102 = (parsed.rooms || []).find(r => String(r.id) === "102");
+        if (r102) {
+          r102.google_script_url = GOOGLE_SCRIPT_WEBHOOK_101;
+          if (!r102.google_ical_url) {
+            r102.google_ical_url = "https://calendar.google.com/calendar/ical/5254f02e175f593d4ee70b0e32cb5dd117a16323e48c472774d6c6739a6021ae%40group.calendar.google.com/public/basic.ics";
           }
         }
         return parsed;
@@ -250,7 +257,7 @@ app.post('/api/bookings', async (req, res) => {
 
   // Auto-push to Google Calendar Webhook
   const room = (db.rooms || []).find(r => String(r.id) === String(booking.room_id));
-  const webhookUrl = room?.google_script_url || (String(booking.room_id) === '101' ? GOOGLE_SCRIPT_WEBHOOK_101 : null);
+  const webhookUrl = room?.google_script_url || (['101', '102'].includes(String(booking.room_id)) ? GOOGLE_SCRIPT_WEBHOOK_101 : null);
   
   if (webhookUrl) {
     try {
@@ -280,7 +287,7 @@ app.delete('/api/bookings', async (req, res) => {
   
   if (toDelete) {
     const room = (db.rooms || []).find(r => String(r.id) === String(toDelete.room_id));
-    const webhookUrl = room?.google_script_url || (String(toDelete.room_id) === '101' ? GOOGLE_SCRIPT_WEBHOOK_101 : null);
+    const webhookUrl = room?.google_script_url || (['101', '102'].includes(String(toDelete.room_id)) ? GOOGLE_SCRIPT_WEBHOOK_101 : null);
     
     if (webhookUrl) {
       try {
